@@ -1,7 +1,8 @@
-import {Component, Input, EventEmitter, Output} from 'angular2/core';
+import {Component, EventEmitter, OnInit} from 'angular2/core';
 import {Todo} from '../models/todo';
 import {TodoForm} from './todo.form';
 import {TodoRepository} from '../services/todo.repository';
+import {ROUTER_DIRECTIVES, Router} from 'angular2/router';
 
 @Component({
   selector: 'todo-list',
@@ -12,7 +13,8 @@ import {TodoRepository} from '../services/todo.repository';
     }`
   ],
   template: `
-    <div class="callout primary">
+    <span>{{remaining}} of {{todos.length}} remaining [ <a (click)="archive()">archive</a> ]</span>
+    <div class="row callout primary">
     <h3>List of Todos</h3>
     <ul class="unstyled">
       <li *ngFor="#todo of todos">
@@ -20,22 +22,45 @@ import {TodoRepository} from '../services/todo.repository';
         <span (click)="editTodo(todo)" class="done-{{todo.done}}">{{todo.text}}</span>
       </li>
     </ul>
-    </div>`
+    </div>
+    <div class="row">
+    <div class="columns small-6 medium-4 small-centered">
+    <a class="button expanded" [routerLink]="['New']">New Todo</a>
+    </div></div>`,
+    directives: [ROUTER_DIRECTIVES]
 })
-export class TodoList {
-  constructor (todoRepository: TodoRepository) {
-    this.todoRepository = todoRepository;
+export class TodoList implements OnInit {
+  constructor (private todoRepository: TodoRepository, private router: Router) {
   }
-  @Input() todos: Todo[];
-  @Output() selectedTodo = new EventEmitter<Todo>();
-  todoRepository: TodoRepository;
 
-  saveTodo (todo: Todo, done: boolean) {
-    todo.done = done;
-    this.todoRepository.save(todo);
+  private todos: Todo[] = [];
+
+  ngOnInit() {
+    this.todoRepository.all().then(todos => this.todos = todos);
+  }
+
+  get remaining() {
+    return this.todos.reduce((count: number, todo: Todo) => count + +!todo.done, 0);
   }
 
   editTodo(todo: Todo) {
-    this.selectedTodo.emit(todo);
+    this.router.navigate(['Edit', {id: todo.id}])
+  }
+
+  saveTodo(todo: Todo, checked: boolean) {
+    todo.done = checked;
+    this.todoRepository.save(todo).then(todo => this.router.navigate(['List']));
+  }
+
+  archive(): void {
+    var oldTodos = this.todos;
+    this.todos = [];
+    oldTodos.forEach((todo: Todo) => {
+      if (!todo.done) {
+        this.todos.push(todo);
+      } else {
+        this.todoRepository.delete(todo.id);
+      }
+    });
   }
 }
